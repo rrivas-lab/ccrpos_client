@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guía Dev: Almacenes CCRPOS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .prose img { max-width: 100%; }
+        nav button.active { background-color: #FF8200; color: white; font-weight: bold; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800">
+    <div id="app" class="flex h-screen">
+        <!-- Sidebar -->
+        <nav id="nav" class="w-64 bg-slate-100 border-r border-slate-200 p-4 overflow-y-auto">
+            <h1 class="text-sm font-bold text-slate-900 mb-6">Guía Dev: Almacenes</h1>
+            <!-- Menu populated by JS -->
+        </nav>
+        
+        <!-- Content -->
+        <main class="flex-1 p-8 overflow-y-auto bg-white">
+            <h2 id="content-title" class="text-xl font-bold mb-6 text-slate-900 border-b pb-2">1. Resumen ejecutivo</h2>
+            <div id="content-body" class="text-sm text-slate-700"></div>
+        </main>
+    </div>
+
+    <script>
+        const sectionsData = {
+            "1. Resumen ejecutivo": "El módulo Almacenes simplifica la operación logística dentro de CCRPOS. La app es el punto de entrada operativo, mientras que Odoo 19 Enterprise es el backend maestro que garantiza la integridad, trazabilidad, inventario real, pickings y estados. App CCRPOS: Gestión operativa (solicitudes, disponibilidad, distribución). Odoo 19: Backend maestro (Productos, Almacenes, Seriales, Pickings, Chatter).",
+            "2. Alcance y fuera de alcance": "Alcance App: Menú por permisos, Solicitudes multiproducto (Equipos y SIM Card), Mis solicitudes, Aprobaciones, Disponibilidad, Distribución, Tracking. Fuera: Crear productos, configurar aprobadores, validar pickings, modificar stock directamente. / Alcance Odoo: Modelos ccr.*, Matriz Aprobación, Pickings/Transferencias, Trazabilidad/Chatter. Fuera: SAP HANA, reglas complejas regionales.",
+            "3. Mapa general del proceso": "Solicitudes: App → Pedir equipos → Solicitud → Odoo → Matriz Aprobación → Picking Único → Validación nativa Odoo. Disponibilidad: Consulta stock real en Odoo. Distribución: App → Distribución seleccionados → Odoo → Transferencias por almacén origen → Validación nativa Odoo. ¡Advertencia: La App no valida pickings!",
+            "4. Roles y permisos": "Solicitante (crea/ve solicitudes, tracking), Aprobador (revisa/edita/aprueba), Super Aprobador (excepciones), Administrador (configura matriz, audita), Distribuidor (gestiona seriales y transferencias internas).",
+            "5. Menú Almacenes según permisos": "Acceso acumulativo dinámico. Solicitante: Pedir, Mis sol., Disp. Aprobador: +Aprobaciones. Distribuidor: +Distribución. Administrador: Todo.",
+            "6. Flujo de Solicitudes": "App: Formulario multiproducto (sección Equipos, sección SIM separada), dirección de entrega, comentario. Sincronización síncrona obligatoria. Odoo: Registro ccr.equipment.request, validación de matriz de aprobación, chatter.",
+            "7. Flujo de Aprobaciones": "App: Bandeja centralizada, edición individual por línea, filtro por estado. Odoo: Registro histórico de modificaciones, diferencia aprov/solic.",
+            "8. Matriz de aprobadores": "Modelo ccr.approval.assignment. Configuración en Odoo solo para Administradores: Aprobador principal, Solicitantes asignados, Activo.",
+            "9. Estados de Solicitud": "Borrador, Pendiente, Sin aprobador, Aprobada, Aprobada con ajustes, Rechazada, Transferencia gen., En prep., Lista, Entregada, Cancelada.",
+            "10. Pickings nativos para Solicitudes": "La solicitud no valida pickings. Aprobación comercial → Generación picking único en Odoo → Asignación seriales en picking → Validación en picking nativo.",
+            "11. Disponibilidad / Inventario y Stock": "Agrupación por producto/almacén. Estados: Disponible, Bajo Stock, No disponible. Detalle de seriales individuales.",
+            "12. Distribución": "Selección de seriales, almacén destino, generación de transferencias automáticas mediante ccr.distribution.",
+            "13. Pickings nativos para Distribución": "Una transferencia por cada almacén origen. Documento origen = DIST-XXXX. Validación nativa en vista de cada picking.",
+            "14. Tracking en app y chatter en Odoo": "App: Eventos simples y claros. Odoo: Auditoría completa en chatter (comentarios, pickings, cambios, aprobaciones).",
+            "15. Sincronización App - Odoo": "Comunicación síncrona: App no confirma acción sin respuesta exitosa de Odoo. Manejo estricto de mensajes de éxito/error.",
+            "16. Modelos Odoo requeridos": "ccr.equipment.request, ccr.equipment.request.line, ccr.approval.assignment, ccr.distribution, ccr.distribution.line.",
+            "17. Contratos de datos App - Odoo": "Ejemplos estructurados de payloads para Crear solicitud, Aprobar con ajustes, Consultar disponibilidad, Crear distribución, Generar transferencias.",
+            "18. Responsabilidades del desarrollador App": "Menú según permisos, Solicitudes multiproducto, Edición por línea en Aprobaciones, Selección seriales, Distribución con botón continuar fijo.",
+            "19. Responsabilidades del desarrollador Odoo": "Modelos ccr.*, Matriz de aprobación, Chatter, Smart Buttons, Pickings nativos asociados.",
+            "20. Casos borde y validaciones": "Manejo de: Usuario sin aprobador, autoaprobación, reducción cantidades, comentario, serial no disponible, varios almacenes origen, producto bajo stock, picking generado, rechazo sin motivo.",
+            "21. Criterios de aceptación": "Pruebas de aceptación: Crear solicitud, disponibilidad, flujo de distribución.",
+            "22. Checklist final por desarrollador": "App: Menú, Solicitudes, Filtros, Tracking, Manejo de errores. Odoo: Modelos, Seguridad, Matriz, Chatter, Smart buttons, Pickings."
+        };
+
+        const nav = document.getElementById('nav');
+        const title = document.getElementById('content-title');
+        const body = document.getElementById('content-body');
+
+        Object.keys(sectionsData).forEach((key, index) => {
+            const btn = document.createElement('button');
+            btn.className = 'w-full text-left p-2 rounded text-xs mb-1 font-medium hover:bg-slate-200 text-slate-700';
+            btn.innerText = key;
+            if(index === 0) btn.classList.add('active');
+            btn.onclick = () => {
+                document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                title.innerText = key;
+                body.innerText = sectionsData[key];
+            };
+            nav.appendChild(btn);
+        });
+        
+        // Initial load
+        body.innerText = Object.values(sectionsData)[0];
+    </script>
+</body>
+</html>
